@@ -1,0 +1,6 @@
+github.com/apple/foundationdb v0.0.0-20201221214801-0ecfaf138e79 h1:UaMow1Yj/MlRDGPuzi2weJ+w7OkihgQAXYw4cmTBF4w=
+github.com/apple/foundationdb/bindings/go v0.0.0-20201221214801-0ecfaf138e79 h1:cICi2ztPBj7D7dpK08nhl5H4w4CLIB8M3lUyJXQ4Apc=
+github.com/apple/foundationdb/bindings/go v0.0.0-20201221214801-0ecfaf138e79/go.mod h1:w63jdZTFCtvdjsUj5yrdKgjxaAD5uXQX6hJ7EaiLFRs=
+github.com/fletcherist/stata v0.0.0-20201222150417-ecc4db53a7e8 h1:ve3Cfrj12PYhIKlFLqbJaxPCL1CWEM+O4Bxk6KX6JQQ=
+golang.org/x/xerrors v0.0.0-20191204190536-9bdfabe68543 h1:E7g+9GITq07hpfrRu66IVDexMakfv52eLZ2CXBWiKr4=
+golang.org/x/xerrors v0.0.0-20191204190536-9bdfabe68543/go.mod h1:I/5z698sn9Ka8TeJc9MKroUUfqBBauWjQqLJ2OPfmY0=
