@@ -39,7 +39,7 @@ func toInt64(b []byte) int64 {
 // StorageConfig config for creating foundationdb backend
 type StorageConfig struct {
 	ClusterFile string
-	Namespace   string
+	Namespace   string // namespace is like a folder for keys
 }
 
 // NewFDBStorage creates new foundationdb stata storage
