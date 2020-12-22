@@ -1,4 +1,4 @@
-module github.com/fletcherist/stata/foundationdb
+module github.com/fletcherist/stata/fdb
 
 go 1.15
 
