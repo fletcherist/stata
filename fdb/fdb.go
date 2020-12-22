@@ -1,7 +1,6 @@
 package statafdb
 
 import (
-	"bytes"
 	"encoding/binary"
 	"errors"
 	"time"
@@ -13,16 +12,16 @@ import (
 	"github.com/apple/foundationdb/bindings/go/src/fdb/tuple"
 )
 
-// fdbStoragePack packs key into fdb tuple
-func fdbStoragePack(key stata.Key) tuple.Tuple {
+// pack packs key into fdb tuple
+func pack(key stata.Key) tuple.Tuple {
 	unixTimestamp := key.Bin.Format(key.Timestamp).Unix()
 	return tuple.Tuple{
 		key.Name, key.Bin.Name, unixTimestamp,
 	}
 }
 
-// fdbStorageUnpack unpacks fdb tuple to stata key
-func fdbStorageUnpack(fdbkey tuple.Tuple) stata.Key {
+// unpack unpacks fdb tuple to stata key
+func unpack(fdbkey tuple.Tuple) stata.Key {
 	return stata.Key{
 		Name: fdbkey[0].(string),
 		Bin: stata.Bin{
@@ -32,25 +31,19 @@ func fdbStorageUnpack(fdbkey tuple.Tuple) stata.Key {
 	}
 }
 
-// ToInt64 converts byte array to int64
-func ToInt64(b []byte) int64 {
+// toInt64 converts byte array to int64
+func toInt64(b []byte) int64 {
 	return int64(binary.LittleEndian.Uint64(b))
 }
 
-// Int64 convert int64 to byte array
-func Int64(i int64) []byte {
-	buffer := new(bytes.Buffer)
-	binary.Write(buffer, binary.LittleEndian, i)
-	return buffer.Bytes()
-}
-
-// FDBStorageConfig config for creating foundationdb backend
-type FDBStorageConfig struct {
+// StorageConfig config for creating foundationdb backend
+type StorageConfig struct {
 	ClusterFile string
+	Namespace   string
 }
 
 // NewFDBStorage creates new foundationdb stata storage
-func NewFDBStorage(config FDBStorageConfig) (*stata.Storage, error) {
+func NewFDBStorage(config StorageConfig) (*stata.Storage, error) {
 	err := fdb.APIVersion(500)
 	if err != nil {
 		return nil, err
@@ -60,12 +53,17 @@ func NewFDBStorage(config FDBStorageConfig) (*stata.Storage, error) {
 		return nil, err
 	}
 
-	subspace, err := directory.CreateOrOpen(db, []string{"stata"}, nil)
+	// default namespace is "stata"
+	var namespace = "stata"
+	if config.Namespace != "" {
+		namespace = config.Namespace
+	}
+	subspace, err := directory.CreateOrOpen(db, []string{namespace}, nil)
 	var countInc = []byte{'\x01', '\x00', '\x00', '\x00', '\x00', '\x00', '\x00', '\x00'}
 
 	storage := stata.Storage{
 		Get: func(key stata.Key) (int64, error) {
-			dbKey := subspace.Pack(fdbStoragePack(key))
+			dbKey := subspace.Pack(pack(key))
 			ret, err := db.Transact(func(tr fdb.Transaction) (interface{}, error) {
 				return tr.Get(dbKey).MustGet(), nil
 			})
@@ -77,13 +75,13 @@ func NewFDBStorage(config FDBStorageConfig) (*stata.Storage, error) {
 			if len(bytes) == 0 {
 				return 0, errors.New("key not found")
 			}
-			val := ToInt64(bytes)
+			val := toInt64(bytes)
 			return val, nil
 		},
 		IncrBy: func(keys []stata.Key, val int64) error {
 			_, err := db.Transact(func(tr fdb.Transaction) (interface{}, error) {
 				for _, key := range keys {
-					dbKey := subspace.Pack(fdbStoragePack(key))
+					dbKey := subspace.Pack(pack(key))
 					tr.Add(dbKey, countInc)
 				}
 				return nil, nil
@@ -94,8 +92,8 @@ func NewFDBStorage(config FDBStorageConfig) (*stata.Storage, error) {
 			return nil
 		},
 		GetRange: func(keyRange stata.KeyRange) ([]stata.KeyValue, error) {
-			dbFrom := subspace.Pack(fdbStoragePack(keyRange.From))
-			dbTo := subspace.Pack(fdbStoragePack(keyRange.To))
+			dbFrom := subspace.Pack(pack(keyRange.From))
+			dbTo := subspace.Pack(pack(keyRange.To))
 
 			ret, err := db.Transact(func(tr fdb.Transaction) (interface{}, error) {
 				rangeResult := tr.GetRange(fdb.KeyRange{
@@ -114,8 +112,8 @@ func NewFDBStorage(config FDBStorageConfig) (*stata.Storage, error) {
 					if err != nil {
 						return nil, err
 					}
-					key := fdbStorageUnpack(fdbTuple)
-					val := ToInt64(kv.Value)
+					key := unpack(fdbTuple)
+					val := toInt64(kv.Value)
 					result = append(result, stata.KeyValue{
 						Key: key, Value: val,
 					})
