@@ -1,4 +1,4 @@
-package foundationdb
+package statafoundationdb
 
 import (
 	"bytes"
