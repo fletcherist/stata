@@ -6,6 +6,11 @@ import (
 	"time"
 )
 
+var (
+	// ErrNotImplemented means feature is not implemented yet
+	ErrNotImplemented = errors.New("not implemented")
+)
+
 // Stata Stata realtime stat tool
 type Stata struct {
 	mu      sync.Mutex
@@ -20,10 +25,11 @@ type Config struct {
 
 // Storage redis storage for stata
 type Storage struct {
-	Get      func(keys Key) (int64, error)
+	Get      func(keys Key) (Value, error)
+	Set      func(key Key, val Value) error
 	GetRange func(keyRange KeyRange) ([]KeyValue, error)
-	IncrBy   func(keys []Key, value int64) error
-	Clear    func() error // removes
+	IncrBy   func(keys []Key, value Value) error
+	Clear    func() error // removes data from storage
 }
 
 // Bin keys
@@ -66,6 +72,9 @@ type Key struct {
 	Bin       Bin
 }
 
+// Value is counter value
+type Value = int64
+
 // KeyRange for queries
 type KeyRange struct {
 	From Key
@@ -95,7 +104,7 @@ func (s *Stata) GetRange(keyRange KeyRange) ([]KeyValue, error) {
 }
 
 // Get increments all counters for that event
-func (s *Stata) Get(key Key) (int64, error) {
+func (s *Stata) Get(key Key) (Value, error) {
 	if s.storage == nil {
 		return 0, errors.New("storage is not initialized yet")
 	}
@@ -125,7 +134,7 @@ type Event struct {
 // KeyValue key-value pair
 type KeyValue struct {
 	Key   Key
-	Value int64
+	Value Value
 }
 
 // Inc increments counters for event

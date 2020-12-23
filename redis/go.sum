@@ -1,4 +1,5 @@
-github.com/fletcherist/stata v0.0.0-20201222150417-ecc4db53a7e8 h1:ve3Cfrj12PYhIKlFLqbJaxPCL1CWEM+O4Bxk6KX6JQQ=
+github.com/fletcherist/stata v1.0.1 h1:IG+869RUR+sbQmT6tcqC0Ulu22t1NxBqrbZ4vYkeZxc=
+github.com/fletcherist/stata v1.0.1/go.mod h1:JiiIaX7f1gt0qfZgzyi5LYz/eddHVAC/VtiLGc6ks1A=
 github.com/fsnotify/fsnotify v1.4.7/go.mod h1:jwhsz4b93w/PPRr/qN1Yymfu8t87LnFCMoQvtojpjFo=
 github.com/fsnotify/fsnotify v1.4.9 h1:hsms1Qyu0jgnwNXIxa+/V/PDsU6CfLf6CNO8H7IWoS4=
 github.com/fsnotify/fsnotify v1.4.9/go.mod h1:znqG4EE+3YCdAaPaxE2ZRY/06pZUdp0tY4IgpuI1SZQ=

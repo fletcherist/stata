@@ -1,4 +1,4 @@
-package stataredis
+package redis
 
 import (
 	"fmt"
@@ -9,8 +9,8 @@ import (
 	goRedis "github.com/go-redis/redis"
 )
 
-// redisStoragePack packs stata key to redis string key
-func redisStoragePack(key stata.Key) string {
+// pack packs stata key to redis string key
+func pack(key stata.Key) string {
 	unixTimestamp := key.Bin.Format(key.Timestamp).Unix()
 	return fmt.Sprint(
 		key.Name,
@@ -24,13 +24,13 @@ type StorageConfig struct {
 	Client *goRedis.Client
 }
 
-// NewRedisStorage creates stata redis storage
-func NewRedisStorage(config StorageConfig) *stata.Storage {
+// NewStorage creates stata redis storage
+func NewStorage(config StorageConfig) *stata.Storage {
 	redisClient := config.Client
 
 	return &stata.Storage{
 		Get: func(key stata.Key) (int64, error) {
-			dbKey := redisStoragePack(key)
+			dbKey := pack(key)
 			result, err := redisClient.Get(dbKey).Result()
 			if err != nil {
 				return 0, err
@@ -43,7 +43,7 @@ func NewRedisStorage(config StorageConfig) *stata.Storage {
 		},
 		IncrBy: func(keys []stata.Key, val int64) error {
 			for _, key := range keys {
-				dbKey := redisStoragePack(key)
+				dbKey := pack(key)
 				err := redisClient.IncrBy(dbKey, val).Err()
 				if err != nil {
 					return err

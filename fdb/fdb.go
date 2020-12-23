@@ -1,4 +1,4 @@
-package statafdb
+package fdb
 
 import (
 	"encoding/binary"
@@ -42,8 +42,8 @@ type StorageConfig struct {
 	Namespace   string // namespace is like a folder for keys
 }
 
-// NewFDBStorage creates new foundationdb stata storage
-func NewFDBStorage(config StorageConfig) (*stata.Storage, error) {
+// NewStorage creates new foundationdb stata storage
+func NewStorage(config StorageConfig) (*stata.Storage, error) {
 	err := fdb.APIVersion(500)
 	if err != nil {
 		return nil, err
