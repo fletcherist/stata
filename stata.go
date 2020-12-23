@@ -198,6 +198,8 @@ func (e *Event) Inc() error {
 		Bin:       Bins.Total,
 	}
 
+	// increment value in cache
+	e.stata.cache.IncrBy([]Key{cacheKey}, 1)
 	val, err := e.stata.cache.Get(cacheKey)
 	if err != nil {
 		return err
@@ -217,9 +219,6 @@ func (e *Event) Inc() error {
 		if err != nil {
 			return err
 		}
-	} else {
-		// inc only in temp
-		e.stata.cache.IncrBy([]Key{cacheKey}, 1)
 	}
 
 	return nil

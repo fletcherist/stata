@@ -2,3 +2,5 @@ github.com/apple/foundationdb/bindings/go v0.0.0-20200220232538-d1f050690a2d h1:
 github.com/apple/foundationdb/bindings/go v0.0.0-20200220232538-d1f050690a2d/go.mod h1:OMVSB21p9+xQUIqlGizHPZfjK+SHws1ht+ZytVDoz9U=
 github.com/fletcherist/stata v1.0.0 h1:fhGZxBYvgpFpqgGrjSzTSL5pCBR7MfT8GQAw/mbcdUw=
 github.com/fletcherist/stata v1.0.0/go.mod h1:JiiIaX7f1gt0qfZgzyi5LYz/eddHVAC/VtiLGc6ks1A=
+github.com/fletcherist/stata v1.0.5 h1:L2FMnKID6D7FkJAaJ8L+mVeIufeBrDcBwm0gXf3mSrI=
+github.com/fletcherist/stata v1.0.5/go.mod h1:JiiIaX7f1gt0qfZgzyi5LYz/eddHVAC/VtiLGc6ks1A=
