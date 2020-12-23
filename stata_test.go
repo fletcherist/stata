@@ -7,6 +7,10 @@ import (
 )
 
 func TestBin(t *testing.T) {
+	t.Run("total", func(t *testing.T) {
+		formatted := Bins.Total.Format(time.Now())
+		fmt.Println(formatted)
+	})
 	t.Run("hour", func(t *testing.T) {
 		hour := 4
 		formatted := Bins.Hour.Format(time.Date(2020, 1, 1, hour, 34, 34, 0, time.UTC))

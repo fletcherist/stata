@@ -75,7 +75,7 @@ type bins struct {
 // Bins list of default bins
 var Bins bins = bins{
 	Total: Bin{Name: "total", Format: func(t time.Time) time.Time {
-		return time.Date(0, 0, 0, 0, 0, 0, 0, t.Location())
+		return time.Unix(0, 0)
 	}},
 	Year: Bin{Name: "y", Format: func(t time.Time) time.Time {
 		return time.Date(t.Year(), 0, 0, 0, 0, 0, 0, t.Location())
