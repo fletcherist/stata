@@ -1,6 +1,7 @@
 package fdb
 
 import (
+	"bytes"
 	"encoding/binary"
 	"errors"
 	"time"
@@ -32,8 +33,15 @@ func unpack(fdbkey tuple.Tuple) stata.Key {
 }
 
 // toInt64 converts byte array to int64
-func toInt64(b []byte) int64 {
+func bytesToInt64(b []byte) int64 {
 	return int64(binary.LittleEndian.Uint64(b))
+}
+
+// int64ToBytes convert int64 to byte array
+func int64ToBytes(i int64) []byte {
+	buffer := new(bytes.Buffer)
+	binary.Write(buffer, binary.LittleEndian, i)
+	return buffer.Bytes()
 }
 
 // StorageConfig config for creating foundationdb backend
@@ -59,7 +67,6 @@ func NewStorage(config StorageConfig) (*stata.Storage, error) {
 		namespace = config.Namespace
 	}
 	subspace, err := directory.CreateOrOpen(db, []string{namespace}, nil)
-	var countInc = []byte{'\x01', '\x00', '\x00', '\x00', '\x00', '\x00', '\x00', '\x00'}
 
 	storage := stata.Storage{
 		Get: func(key stata.Key) (int64, error) {
@@ -75,14 +82,14 @@ func NewStorage(config StorageConfig) (*stata.Storage, error) {
 			if len(bytes) == 0 {
 				return 0, errors.New("key not found")
 			}
-			val := toInt64(bytes)
+			val := bytesToInt64(bytes)
 			return val, nil
 		},
 		IncrBy: func(keys []stata.Key, val int64) error {
 			_, err := db.Transact(func(tr fdb.Transaction) (interface{}, error) {
 				for _, key := range keys {
 					dbKey := subspace.Pack(pack(key))
-					tr.Add(dbKey, countInc)
+					tr.Add(dbKey, int64ToBytes(val))
 				}
 				return nil, nil
 			})
@@ -113,7 +120,7 @@ func NewStorage(config StorageConfig) (*stata.Storage, error) {
 						return nil, err
 					}
 					key := unpack(fdbTuple)
-					val := toInt64(kv.Value)
+					val := bytesToInt64(kv.Value)
 					result = append(result, stata.KeyValue{
 						Key: key, Value: val,
 					})

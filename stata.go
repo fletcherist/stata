@@ -15,7 +15,32 @@ var (
 type Stata struct {
 	mu      sync.Mutex
 	storage *Storage
+	cache   *Storage
 	events  map[string]*Event
+}
+
+// Mode mode manages storage behavior while writing keys
+type Mode struct {
+	NeedWriteKey func(key KeyValue) bool
+}
+
+// ModeDefault this mode writes every update to storage, bypassing cache
+var ModeDefault Mode = Mode{
+	NeedWriteKey: func(kv KeyValue) bool {
+		// write every key update immediately to storage
+		return true
+	},
+}
+
+// ModeReduceWorkload this mode reduces workload to storage by using in-memory cache layer
+var ModeReduceWorkload Mode = Mode{
+	NeedWriteKey: func(kv KeyValue) bool {
+		if kv.Value%10 == 0 {
+			return true
+		}
+		// otherwise write to cache
+		return false
+	},
 }
 
 // Config config
@@ -23,9 +48,9 @@ type Config struct {
 	Storage *Storage
 }
 
-// Storage redis storage for stata
+// Storage storage interface for stata
 type Storage struct {
-	Get      func(keys Key) (Value, error)
+	Get      func(key Key) (Value, error)
 	Set      func(key Key, val Value) error
 	GetRange func(keyRange KeyRange) ([]KeyValue, error)
 	IncrBy   func(keys []Key, value Value) error
@@ -39,6 +64,7 @@ type Bin struct {
 }
 
 type bins struct {
+	Total  Bin
 	Month  Bin
 	Year   Bin
 	Hour   Bin
@@ -48,6 +74,9 @@ type bins struct {
 
 // Bins list of default bins
 var Bins bins = bins{
+	Total: Bin{Name: "total", Format: func(t time.Time) time.Time {
+		return time.Date(0, 0, 0, 0, 0, 0, 0, t.Location())
+	}},
 	Year: Bin{Name: "y", Format: func(t time.Time) time.Time {
 		return time.Date(t.Year(), 0, 0, 0, 0, 0, 0, t.Location())
 	}},
@@ -81,16 +110,29 @@ type KeyRange struct {
 	To   Key
 }
 
+// EventConfig config params for event
+type EventConfig struct {
+	Bins []Bin
+	Mode *Mode
+}
+
 // Event creates new event
-func (s *Stata) Event(name string, bins []Bin) *Event {
+func (s *Stata) Event(name string, config EventConfig) *Event {
+	var mode *Mode = func() *Mode {
+		if config.Mode != nil {
+			return config.Mode
+		}
+		return &ModeDefault
+	}()
 	event := &Event{
 		stata: s,
-		bins:  bins,
+		bins:  config.Bins,
+		mode:  mode,
 		Name:  name,
 	}
 	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.events[name] = event
-	s.mu.Unlock()
 	return event
 }
 
@@ -126,9 +168,10 @@ func (s *Stata) GetEvents() []*Event {
 
 // Event foundationdb house event
 type Event struct {
+	Name  string
 	stata *Stata
 	bins  []Bin
-	Name  string
+	mode  *Mode
 }
 
 // KeyValue key-value pair
@@ -140,7 +183,6 @@ type KeyValue struct {
 // Inc increments counters for event
 func (e *Event) Inc() error {
 	var keys []Key = []Key{}
-
 	for _, bin := range e.bins {
 		key := Key{
 			Timestamp: time.Now(),
@@ -150,20 +192,49 @@ func (e *Event) Inc() error {
 		keys = append(keys, key)
 	}
 
-	if e.stata.storage == nil {
-		return errors.New("storage is not initialized yet")
+	cacheKey := Key{
+		Timestamp: time.Now(),
+		Name:      e.Name,
+		Bin:       Bins.Total,
 	}
-	err := e.stata.storage.IncrBy(keys, 1)
+
+	val, err := e.stata.cache.Get(cacheKey)
 	if err != nil {
 		return err
 	}
+	needWrite := e.mode.NeedWriteKey(KeyValue{
+		Key:   cacheKey,
+		Value: val,
+	})
+	// it's time to write keys to storage
+	if needWrite {
+		err := e.stata.storage.IncrBy(keys, val)
+		if err != nil {
+			return err
+		}
+		// reset cache
+		err = e.stata.cache.Set(cacheKey, 0)
+		if err != nil {
+			return err
+		}
+	} else {
+		// inc only in temp
+		e.stata.cache.IncrBy([]Key{cacheKey}, 1)
+	}
+
 	return nil
 }
 
 // New creates new stata client
 func New(config *Config) *Stata {
+	var storage *Storage = config.Storage
+	// use in-memory storage if not initialized
+	if storage == nil {
+		storage = NewMemoryStorage()
+	}
 	return &Stata{
-		storage: config.Storage,
+		storage: storage,
 		events:  make(map[string]*Event),
+		cache:   NewMemoryStorage(),
 	}
 }

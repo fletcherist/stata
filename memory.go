@@ -1,4 +1,4 @@
-package memory
+package stata
 
 import (
 	"fmt"
@@ -6,12 +6,10 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/fletcherist/stata"
 )
 
 // pack packs stata key to in-memory string key
-func pack(key stata.Key) string {
+func pack(key Key) string {
 	unixTimestamp := key.Bin.Format(key.Timestamp).Unix()
 	return fmt.Sprint(
 		key.Name,
@@ -21,32 +19,32 @@ func pack(key stata.Key) string {
 }
 
 // unpack unpacks key from in-memory key-value to stata key
-func unpack(key string) stata.Key {
+func unpack(key string) Key {
 	split := strings.Split(key, ":")
 	tsInt64, err := strconv.ParseInt(split[2], 10, 64)
 	if err != nil {
 		panic(err)
 	}
-	return stata.Key{
+	return Key{
 		Name: split[0],
-		Bin: stata.Bin{
+		Bin: Bin{
 			Name: split[1],
 		},
 		Timestamp: time.Unix(tsInt64, 0),
 	}
 }
 
-// NewStorage creates in-memory storage for stata counters
-func NewStorage() *stata.Storage {
+// NewMemoryStorage creates in-memory storage for stata counters
+func NewMemoryStorage() *Storage {
 	storage := struct {
 		mu sync.Mutex
-		kv map[string]stata.Value // key-value in-memory storage
+		kv map[string]Value // key-value in-memory storage
 	}{
-		kv: make(map[string]stata.Value),
+		kv: make(map[string]Value),
 	}
 
-	return &stata.Storage{
-		Get: func(key stata.Key) (stata.Value, error) {
+	return &Storage{
+		Get: func(key Key) (Value, error) {
 			storage.mu.Lock()
 			defer storage.mu.Unlock()
 			val, exist := storage.kv[pack(key)]
@@ -55,13 +53,13 @@ func NewStorage() *stata.Storage {
 			}
 			return val, nil
 		},
-		Set: func(key stata.Key, val stata.Value) error {
+		Set: func(key Key, val Value) error {
 			storage.mu.Lock()
 			defer storage.mu.Unlock()
 			storage.kv[pack(key)] = val
 			return nil
 		},
-		IncrBy: func(keys []stata.Key, val int64) error {
+		IncrBy: func(keys []Key, val int64) error {
 			storage.mu.Lock()
 			defer storage.mu.Unlock()
 			for _, key := range keys {

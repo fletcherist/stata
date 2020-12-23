@@ -1,20 +1,18 @@
-package memory
+package stata
 
 import (
 	"fmt"
 	"sync"
 	"testing"
 	"time"
-
-	"github.com/fletcherist/stata"
 )
 
 func TestInc(t *testing.T) {
-	storage := NewStorage()
-	key := stata.Key{
+	storage := NewMemoryStorage()
+	key := Key{
 		Name:      "test",
 		Timestamp: time.Now(),
-		Bin:       stata.Bins.Minute,
+		Bin:       Bins.Minute,
 	}
 
 	var wg sync.WaitGroup
@@ -23,7 +21,7 @@ func TestInc(t *testing.T) {
 	for i := 1; i <= count; i++ {
 		wg.Add(1)
 		go func(wg *sync.WaitGroup) {
-			err := storage.IncrBy([]stata.Key{key}, 1)
+			err := storage.IncrBy([]Key{key}, 1)
 			if err != nil {
 				t.Error(err)
 			}
