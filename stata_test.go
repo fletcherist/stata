@@ -51,18 +51,20 @@ func TestStataInc(t *testing.T) {
 
 func TestStataAvg(t *testing.T) {
 	stataClient := New(&Config{Storage: NewMemoryStorage()})
-
-	counter := stataClient.EventAvg("count", EventConfig{Bins: []Bin{Bins.Total}})
+	counter := stataClient.EventAvg("count", EventConfig{
+		Bins: []Bin{Bins.Total},
+		Mode: &ModeReduceWorkload,
+	})
 
 	var (
 		sum   int64 = 0
 		count int64 = 0
 	)
 
-	for i := 1; i <= 10000; i++ {
+	for i := 1; i <= 1000; i++ {
+		counter.Inc(int64(i))
 		count++
 		sum += int64(i)
-		counter.Inc(int64(i))
 	}
 
 	avg := sum / count
@@ -74,7 +76,9 @@ func TestStataAvg(t *testing.T) {
 		t.Error(err)
 	}
 	if val != avg {
-		t.Error("event value want: 1", "got:", val)
+		t.Error("event value want: ", avg, "got:", val)
+	} else {
+		fmt.Println("test passed, val:", val)
 	}
-	fmt.Println(val)
+
 }

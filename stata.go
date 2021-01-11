@@ -214,25 +214,21 @@ func (e *Event) Inc() error {
 		keys = append(keys, key)
 	}
 
-	cacheKey := Key{
-		Timestamp: time.Now(),
-		Name:      e.Name,
-		Bin:       Bins.Total,
-	}
+	cacheKey := Key{Timestamp: time.Now(), Name: e.Name, Bin: Bins.Total}
 
 	// increment value in cache
 	e.stata.cache.IncrBy([]Key{cacheKey}, 1)
-	val, err := e.stata.cache.Get(cacheKey)
+	cacheVal, err := e.stata.cache.Get(cacheKey)
 	if err != nil {
 		return err
 	}
 	needWrite := e.mode.NeedWriteKey(KeyValue{
 		Key:   cacheKey,
-		Value: val,
+		Value: cacheVal,
 	})
 	// it's time to write keys to storage
 	if needWrite {
-		err := e.stata.storage.IncrBy(keys, val)
+		err := e.stata.storage.IncrBy(keys, cacheVal)
 		if err != nil {
 			return err
 		}
@@ -260,63 +256,91 @@ func (e *EventAvg) Inc(val int64) error {
 	keyNameCount := fmt.Sprint(e.Name, "_avgcount")
 	keyNameSum := fmt.Sprint(e.Name, "_avgsum")
 
-	var keysCount []Key = []Key{}
-	var keysSum []Key = []Key{}
+	cacheKeyCount := Key{Timestamp: time.Now(), Name: keyNameCount, Bin: Bins.Total}
+	cacheKeySum := Key{Timestamp: time.Now(), Name: keyNameSum, Bin: Bins.Total}
 
-	var getKeyCount = func(bin Bin) Key {
-		return Key{
-			Timestamp: time.Now(),
-			Name:      keyNameCount,
-			Bin:       bin,
-		}
-	}
-	var getKeySum = func(bin Bin) Key {
-		return Key{
-			Timestamp: time.Now(),
-			Name:      keyNameSum,
-			Bin:       bin,
-		}
-	}
-
-	for _, bin := range e.bins {
-		keyCount := getKeyCount(bin)
-		keySum := getKeySum(bin)
-
-		keysCount = append(keysCount, keyCount)
-		keysSum = append(keysSum, keySum)
-	}
-
-	err := e.stata.storage.IncrBy(keysCount, 1)
+	// increment value in cache
+	e.stata.cache.IncrBy([]Key{cacheKeyCount}, 1)
+	e.stata.cache.IncrBy([]Key{cacheKeySum}, val)
+	cacheValCount, err := e.stata.cache.Get(cacheKeyCount)
 	if err != nil {
 		return err
 	}
-	err = e.stata.storage.IncrBy(keysSum, val)
+	cacheValSum, err := e.stata.cache.Get(cacheKeySum)
 	if err != nil {
 		return err
 	}
+	needWrite := e.mode.NeedWriteKey(KeyValue{
+		Key:   cacheKeyCount,
+		Value: val,
+	})
 
-	// now take incremented values, calc avg and set avg value for every bin
-	for _, bin := range e.bins {
-		keyCount := getKeyCount(bin)
-		keySum := getKeySum(bin)
+	// it's time to write keys to storage
+	if needWrite {
+		var keysCount []Key = []Key{}
+		var keysSum []Key = []Key{}
 
-		valCount, err := e.stata.storage.Get(keyCount)
+		var getKeyCount = func(bin Bin) Key {
+			return Key{Timestamp: time.Now(), Name: keyNameCount, Bin: bin}
+		}
+		var getKeySum = func(bin Bin) Key {
+			return Key{Timestamp: time.Now(), Name: keyNameSum, Bin: bin}
+		}
+
+		for _, bin := range e.bins {
+			keyCount := getKeyCount(bin)
+			keySum := getKeySum(bin)
+
+			keysCount = append(keysCount, keyCount)
+			keysSum = append(keysSum, keySum)
+		}
+
+		err := e.stata.storage.IncrBy(keysCount, cacheValCount)
 		if err != nil {
 			return err
 		}
-		valSum, err := e.stata.storage.Get(keySum)
+		err = e.stata.storage.IncrBy(keysSum, cacheValSum)
 		if err != nil {
 			return err
 		}
-		if valCount == 0 {
-			return errors.New("value count couldn't be zero")
+
+		fmt.Println("cacheValCount", cacheValCount, "cacheValSum", cacheValSum)
+
+		// now take incremented values, calc avg and set avg value for every bin
+		for _, bin := range e.bins {
+			keyCount := getKeyCount(bin)
+			keySum := getKeySum(bin)
+
+			valCount, err := e.stata.storage.Get(keyCount)
+			if err != nil {
+				return err
+			}
+			valSum, err := e.stata.storage.Get(keySum)
+			if err != nil {
+				return err
+			}
+			if valCount == 0 {
+				return errors.New("value count couldn't be zero")
+			}
+
+			valAvg := valSum / valCount
+
+			fmt.Println("valAvg", valAvg, "valSum", valSum, "valCount", valCount)
+			err = e.stata.storage.Set(Key{
+				Name:      e.Name,
+				Timestamp: time.Now(),
+				Bin:       bin,
+			}, valAvg)
+			if err != nil {
+				return err
+			}
 		}
-		valAvg := valSum / valCount
-		err = e.stata.storage.Set(Key{
-			Name:      e.Name,
-			Timestamp: time.Now(),
-			Bin:       bin,
-		}, valAvg)
+		// reset cache
+		err = e.stata.cache.Set(cacheKeyCount, 0)
+		if err != nil {
+			return err
+		}
+		err = e.stata.cache.Set(cacheKeySum, 0)
 		if err != nil {
 			return err
 		}
