@@ -2,6 +2,7 @@ package stata
 
 import (
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 )
@@ -13,10 +14,11 @@ var (
 
 // Stata Stata realtime stat tool
 type Stata struct {
-	mu      sync.Mutex
-	storage *Storage
-	cache   *Storage
-	events  map[string]*Event
+	mu        sync.Mutex
+	storage   *Storage
+	cache     *Storage
+	events    map[string]*Event
+	eventsAvg map[string]*EventAvg
 }
 
 // Mode mode manages storage behavior while writing keys
@@ -104,6 +106,12 @@ type Key struct {
 // Value is counter value
 type Value = int64
 
+// KeyValue key-value pair
+type KeyValue struct {
+	Key   Key
+	Value Value
+}
+
 // KeyRange for queries
 type KeyRange struct {
 	From Key
@@ -133,6 +141,26 @@ func (s *Stata) Event(name string, config EventConfig) *Event {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.events[name] = event
+	return event
+}
+
+// EventAvg creates avg event
+func (s *Stata) EventAvg(name string, config EventConfig) *EventAvg {
+	var mode *Mode = func() *Mode {
+		if config.Mode != nil {
+			return config.Mode
+		}
+		return &ModeDefault
+	}()
+	event := &EventAvg{
+		stata: s,
+		bins:  config.Bins,
+		mode:  mode,
+		Name:  name,
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.eventsAvg[name] = event
 	return event
 }
 
@@ -166,18 +194,12 @@ func (s *Stata) GetEvents() []*Event {
 	return events
 }
 
-// Event foundationdb house event
+// Event simple counter
 type Event struct {
 	Name  string
 	stata *Stata
 	bins  []Bin
 	mode  *Mode
-}
-
-// KeyValue key-value pair
-type KeyValue struct {
-	Key   Key
-	Value Value
 }
 
 // Inc increments counters for event
@@ -224,6 +246,85 @@ func (e *Event) Inc() error {
 	return nil
 }
 
+// EventAvg calcs avg between increment executions
+type EventAvg struct {
+	Name  string
+	stata *Stata
+	bins  []Bin
+	mode  *Mode
+}
+
+// Inc calculates average value among all passed values for every bin
+func (e *EventAvg) Inc(val int64) error {
+	// cache is not supported yet
+	keyNameCount := fmt.Sprint(e.Name, "_avgcount")
+	keyNameSum := fmt.Sprint(e.Name, "_avgsum")
+
+	var keysCount []Key = []Key{}
+	var keysSum []Key = []Key{}
+
+	var getKeyCount = func(bin Bin) Key {
+		return Key{
+			Timestamp: time.Now(),
+			Name:      keyNameCount,
+			Bin:       bin,
+		}
+	}
+	var getKeySum = func(bin Bin) Key {
+		return Key{
+			Timestamp: time.Now(),
+			Name:      keyNameSum,
+			Bin:       bin,
+		}
+	}
+
+	for _, bin := range e.bins {
+		keyCount := getKeyCount(bin)
+		keySum := getKeySum(bin)
+
+		keysCount = append(keysCount, keyCount)
+		keysSum = append(keysSum, keySum)
+	}
+
+	err := e.stata.storage.IncrBy(keysCount, 1)
+	if err != nil {
+		return err
+	}
+	err = e.stata.storage.IncrBy(keysSum, val)
+	if err != nil {
+		return err
+	}
+
+	// now take incremented values, calc avg and set avg value for every bin
+	for _, bin := range e.bins {
+		keyCount := getKeyCount(bin)
+		keySum := getKeySum(bin)
+
+		valCount, err := e.stata.storage.Get(keyCount)
+		if err != nil {
+			return err
+		}
+		valSum, err := e.stata.storage.Get(keySum)
+		if err != nil {
+			return err
+		}
+		if valCount == 0 {
+			return errors.New("value count couldn't be zero")
+		}
+		valAvg := valSum / valCount
+		err = e.stata.storage.Set(Key{
+			Name:      e.Name,
+			Timestamp: time.Now(),
+			Bin:       bin,
+		}, valAvg)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // New creates new stata client
 func New(config *Config) *Stata {
 	var storage *Storage = config.Storage
@@ -232,8 +333,9 @@ func New(config *Config) *Stata {
 		storage = NewMemoryStorage()
 	}
 	return &Stata{
-		storage: storage,
-		events:  make(map[string]*Event),
-		cache:   NewMemoryStorage(),
+		storage:   storage,
+		events:    make(map[string]*Event),
+		eventsAvg: make(map[string]*EventAvg),
+		cache:     NewMemoryStorage(),
 	}
 }

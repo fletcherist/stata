@@ -28,3 +28,53 @@ func TestBin(t *testing.T) {
 		}
 	})
 }
+
+func TestStataInc(t *testing.T) {
+	stataClient := New(&Config{
+		Storage: NewMemoryStorage(),
+	})
+
+	counter := stataClient.Event("count", EventConfig{Bins: []Bin{Bins.Total}})
+	counter.Inc()
+
+	val, err := stataClient.Get(Key{
+		Name: counter.Name,
+		Bin:  Bins.Total,
+	})
+	if err != nil {
+		t.Error(err)
+	}
+	if val != 1 {
+		t.Error("event value want: 1", "got:", val)
+	}
+}
+
+func TestStataAvg(t *testing.T) {
+	stataClient := New(&Config{Storage: NewMemoryStorage()})
+
+	counter := stataClient.EventAvg("count", EventConfig{Bins: []Bin{Bins.Total}})
+
+	var (
+		sum   int64 = 0
+		count int64 = 0
+	)
+
+	for i := 1; i <= 10000; i++ {
+		count++
+		sum += int64(i)
+		counter.Inc(int64(i))
+	}
+
+	avg := sum / count
+	val, err := stataClient.Get(Key{
+		Name: counter.Name,
+		Bin:  Bins.Total,
+	})
+	if err != nil {
+		t.Error(err)
+	}
+	if val != avg {
+		t.Error("event value want: 1", "got:", val)
+	}
+	fmt.Println(val)
+}
