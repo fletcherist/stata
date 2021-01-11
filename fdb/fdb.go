@@ -85,6 +85,17 @@ func NewStorage(config StorageConfig) (*stata.Storage, error) {
 			val := bytesToInt64(bytes)
 			return val, nil
 		},
+		Set: func(key stata.Key, val stata.Value) error {
+			dbKey := subspace.Pack(pack(key))
+			_, err := db.Transact(func(tr fdb.Transaction) (interface{}, error) {
+				tr.Set(dbKey, int64ToBytes(val))
+				return nil, nil
+			})
+			if err != nil {
+				return err
+			}
+			return nil
+		},
 		IncrBy: func(keys []stata.Key, val int64) error {
 			_, err := db.Transact(func(tr fdb.Transaction) (interface{}, error) {
 				for _, key := range keys {

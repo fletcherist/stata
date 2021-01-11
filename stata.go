@@ -304,8 +304,6 @@ func (e *EventAvg) Inc(val int64) error {
 			return err
 		}
 
-		fmt.Println("cacheValCount", cacheValCount, "cacheValSum", cacheValSum)
-
 		// now take incremented values, calc avg and set avg value for every bin
 		for _, bin := range e.bins {
 			keyCount := getKeyCount(bin)
@@ -324,8 +322,6 @@ func (e *EventAvg) Inc(val int64) error {
 			}
 
 			valAvg := valSum / valCount
-
-			fmt.Println("valAvg", valAvg, "valSum", valSum, "valCount", valCount)
 			err = e.stata.storage.Set(Key{
 				Name:      e.Name,
 				Timestamp: time.Now(),
