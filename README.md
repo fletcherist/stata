@@ -58,7 +58,7 @@ func main() {
 		Name: counter.Name,
 		Bin:  stata.Bins.Minute,
 	})
-	// value would be 1
+	// prints "3"
 	fmt.Println(value)
 }
 ```
